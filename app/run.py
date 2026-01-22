@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import os
-from __init__ import create_app, db
+from app import create_app, db
 
 # Create Flask app
-app = create_app(os.environ.get('FLASK_ENV', 'development'))
+app = create_app(os.environ.get('FLASK_ENV', 'production'))
 
 if __name__ == '__main__':
     # Initialize database

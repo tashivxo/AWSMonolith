@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify
-from models import db, Project, InventoryItem, Contact
+from app.models import db, Project, InventoryItem, Contact
 from datetime import datetime
 import logging
 
