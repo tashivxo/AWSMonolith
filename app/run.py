@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 import os
-from app import create_app, db
+import sys
+
+# Add parent directory to path so we can import app module
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from __init__ import create_app, db
 
 # Create Flask app
 app = create_app(os.environ.get('FLASK_ENV', 'production'))

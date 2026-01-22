@@ -1,7 +1,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
-from app.config import config
-from app.models import db
+from config import config
+from models import db
 import os
 import logging
 
@@ -26,7 +26,7 @@ def create_app(config_name=None):
         db.create_all()
     
     # Register blueprints
-    from app.routes import api_bp, web_bp
+    from routes import api_bp, web_bp
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(web_bp)
     
