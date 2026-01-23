@@ -4,6 +4,11 @@ set -e
 # Update system packages
 yum update -y
 
+# Install and start SSM Agent (already installed on Amazon Linux 2, but ensure it's running)
+yum install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
 # Install Python and dependencies
 yum install -y python3 python3-pip python3-devel gcc mysql-devel git nginx
 

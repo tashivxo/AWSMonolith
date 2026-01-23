@@ -313,6 +313,12 @@ resource "aws_iam_role_policy" "cloudwatch" {
   })
 }
 
+# IAM Policy for SSM (Systems Manager)
+resource "aws_iam_role_policy_attachment" "ssm_managed_instance" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # IAM Instance Profile
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.project_name}-ec2-profile"
