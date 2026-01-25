@@ -2,20 +2,20 @@
 import os
 import sys
 
-# Add parent directory to path so we can import app module
+# Ensure the current directory is in the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from __init__ import create_app, db
+from __init__ import create_app
 
-# Create Flask app
+# Create Flask app instance for Gunicorn
 app = create_app(os.environ.get('FLASK_ENV', 'production'))
 
 if __name__ == '__main__':
-    # Initialize database
+    # This block is for local development only
     with app.app_context():
+        from models import db
         db.create_all()
     
-    # Run development server
     app.run(
         host='0.0.0.0',
         port=int(os.environ.get('PORT', 5000)),

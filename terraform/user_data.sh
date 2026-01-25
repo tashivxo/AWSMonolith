@@ -4,6 +4,11 @@ set -e
 # Update system packages
 yum update -y
 
+# Install and start SSM Agent (already installed on Amazon Linux 2, but ensure it's running)
+yum install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
 # Install Python and dependencies
 yum install -y python3 python3-pip python3-devel gcc mysql-devel git nginx
 
@@ -11,24 +16,27 @@ yum install -y python3 python3-pip python3-devel gcc mysql-devel git nginx
 mkdir -p /opt/monolith
 cd /opt/monolith
 
-# Clone or download application code
-# Note: In production, use CodeDeploy or configure Git access
-# For now, we'll create a basic placeholder that loads from S3 or git
+# Clone application code from GitHub
+git clone https://github.com/tashivxo/AWSMonolith.git /tmp/monolith-repo
+mv /tmp/monolith-repo/app/* /opt/monolith/
+rm -rf /tmp/monolith-repo
+
+# Initialize git in the app directory for future deployments
+git init
+git remote add origin https://github.com/tashivxo/AWSMonolith.git
+git fetch origin
+git checkout -b main origin/main
 
 # Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# If using Git (ensure EC2 has Git access):
-# git clone https://github.com/tashivxo/AWSMonolith.git .
-# cd app
-
-# For development, we'll install Flask and create basic app
+# Install dependencies from requirements.txt
 pip install --upgrade pip
-pip install Flask Flask-SQLAlchemy Flask-CORS PyMySQL gunicorn python-dotenv
+pip install -r requirements.txt
 
-# Create basic Flask app structure if not cloned
-if [ ! -f "run.py" ]; then
+# Skip placeholder creation since we have real app
+if false; then
     cat > requirements.txt <<'REQEOF'
 Flask==3.0.0
 Flask-SQLAlchemy==3.1.1

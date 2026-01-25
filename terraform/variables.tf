@@ -49,19 +49,19 @@ variable "instance_type" {
 variable "asg_min_size" {
   description = "Minimum size of Auto Scaling Group"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "asg_max_size" {
   description = "Maximum size of Auto Scaling Group"
   type        = number
-  default     = 4
+  default     = 2
 }
 
 variable "asg_desired_capacity" {
   description = "Desired capacity of Auto Scaling Group"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "ssh_cidr" {
