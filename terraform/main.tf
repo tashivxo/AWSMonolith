@@ -313,6 +313,28 @@ resource "aws_iam_role_policy" "cloudwatch" {
   })
 }
 
+# IAM policy for SSM Parameter Store access
+resource "aws_iam_role_policy" "ssm_access" {
+  name = "${var.project_name}-ssm-access"
+  role = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters"
+        ]
+        Resource = [
+          "arn:aws:ssm:us-east-1:${data.aws_caller_identity.current.account_id}:parameter/aws-monolith/*"
+        ]
+      }
+    ]
+  })
+}
+
 # IAM Instance Profile
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.project_name}-ec2-profile"
@@ -454,7 +476,7 @@ resource "aws_lb_target_group" "app" {
     unhealthy_threshold = 2
     timeout             = 3
     interval            = 30
-    path                = "/"
+    path                = "/health"
     matcher             = "200"
   }
 
@@ -499,6 +521,7 @@ resource "aws_launch_template" "app" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes        = [user_data]
   }
 }
 

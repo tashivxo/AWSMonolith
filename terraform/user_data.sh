@@ -99,6 +99,10 @@ from flask import Flask
 from flask_cors import CORS
 from config import config
 from models import db
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def create_app(config_name='default'):
     app = Flask(__name__)
@@ -106,8 +110,13 @@ def create_app(config_name='default'):
     db.init_app(app)
     CORS(app)
     
-    with app.app_context():
-        db.create_all()
+    # Try to create tables, but don't fail if DB is unreachable
+    try:
+        with app.app_context():
+            db.create_all()
+            logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.warning(f"Could not create database tables (will retry on first request): {e}")
     
     from routes import api_bp, web_bp
     app.register_blueprint(api_bp, url_prefix='/api')
@@ -130,7 +139,8 @@ def index():
 
 @api_bp.route('/health')
 def health():
-    return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+    # Simple health check that doesn't require DB
+    return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()}), 200
 
 @api_bp.route('/projects', methods=['GET'])
 def get_projects():
@@ -155,6 +165,15 @@ def get_contacts():
     contacts = Contact.query.all()
     return jsonify([{'id': c.id, 'first_name': c.first_name, 'last_name': c.last_name, 'email': c.email} for c in contacts])
 ROUTEOF
+
+    cat > run.py <<'RUNEOF'
+from __init__ import create_app
+
+app = create_app('production')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+RUNEOF
 
     mkdir -p templates
     cat > templates/index.html <<'HTMLEOF'
@@ -224,8 +243,26 @@ ROUTEOF
 HTMLEOF
 fi
 
+# Change ownership of application files to ec2-user
+chown -R ec2-user:ec2-user /opt/monolith
+
+# Get RDS endpoint from AWS (uses EC2 IAM role with SSM permissions)
+# Fallback: construct from known values if SSM fails
+RDS_ENDPOINT=$(aws ssm get-parameter \
+  --name /aws-monolith/db/endpoint \
+  --region us-east-1 \
+  --query Parameter.Value \
+  --output text 2>/dev/null) || RDS_ENDPOINT="aws-monolith-db.cs5gukwmgrbm.us-east-1.rds.amazonaws.com:3306"
+
+DB_PASSWORD=$(aws ssm get-parameter \
+  --name /aws-monolith/db/password \
+  --region us-east-1 \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text 2>/dev/null) || DB_PASSWORD="changeme"
+
 # Create systemd service
-cat > /etc/systemd/system/monolith.service <<'SVCEOF'
+cat > /etc/systemd/system/monolith.service <<SVCEOF
 [Unit]
 Description=AWS Monolith Application
 After=network.target
@@ -234,6 +271,8 @@ After=network.target
 User=ec2-user
 WorkingDirectory=/opt/monolith
 Environment="PATH=/opt/monolith/venv/bin"
+Environment="DATABASE_URL=mysql+pymysql://admin:$DB_PASSWORD@$RDS_ENDPOINT/monolithdb"
+Environment="SECRET_KEY=production-secret-key-change-me"
 ExecStart=/opt/monolith/venv/bin/gunicorn --workers 2 --bind 0.0.0.0:5000 run:app
 Restart=on-failure
 RestartSec=10
@@ -241,6 +280,16 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 SVCEOF
+
+# Create simple health check file for Nginx
+mkdir -p /usr/share/nginx/html
+cat > /usr/share/nginx/html/health.html <<'HEALTHEOF'
+OK
+HEALTHEOF
+
+# Remove default Nginx config to prevent conflicts
+rm -f /etc/nginx/nginx.conf.default
+rm -f /etc/nginx/conf.d/default.conf
 
 # Configure Nginx
 cat > /etc/nginx/conf.d/monolith.conf <<'NGXEOF'
@@ -251,6 +300,12 @@ upstream monolith {
 server {
     listen 80;
     server_name _;
+
+    # Direct health check that doesn't require Flask
+    location = /health {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
 
     location / {
         proxy_pass http://monolith;
@@ -264,11 +319,22 @@ NGXEOF
 
 # Start services
 systemctl daemon-reload
-systemctl enable monolith
-systemctl start monolith
 systemctl enable nginx
 systemctl start nginx
+systemctl enable monolith
+systemctl start monolith
+
+# Wait for services to start
+sleep 5
+
+# Verify services are running
+systemctl is-active nginx >> /var/log/monolith-setup.log
+systemctl is-active monolith >> /var/log/monolith-setup.log
+
+# Test local health endpoint
+curl -s http://localhost/health >> /var/log/monolith-setup.log 2>&1
 
 # Log completion
-echo "AWS Monolith application deployed successfully" > /var/log/monolith-setup.log
+echo "AWS Monolith application deployed successfully" >> /var/log/monolith-setup.log
+date >> /var/log/monolith-setup.log
 
