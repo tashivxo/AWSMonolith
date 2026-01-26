@@ -16,7 +16,7 @@ class DevelopmentConfig(Config):
     TESTING = False
     SQLALCHEMY_ECHO = True
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'mysql+pymysql://admin:password@localhost:3306/monolithdb'
+        'sqlite:///monolith.db'
 
 class ProductionConfig(Config):
     """Production configuration"""
